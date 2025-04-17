@@ -9,5 +9,8 @@ data class ChatMessage(
     val username: String,
     val message: String,
     val time: Long,
-    val isSentByUser: Boolean // true = sent, false = received
+    val isSentByUser: Boolean, // true = sent, false = received
+    val userFlag: String,
+    val isSynced: Boolean,
+    val isRead: Boolean
 )

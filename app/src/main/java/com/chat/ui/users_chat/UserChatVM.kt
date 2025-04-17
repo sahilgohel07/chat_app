@@ -3,10 +3,8 @@ package com.chat.ui.users_chat
 import android.app.Application
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.chat.data.ChatRepository
@@ -14,12 +12,12 @@ import com.chat.data.database.ChatDatabase
 import com.chat.data.model.ChatMessage
 import com.chat.utils.NetworkStatusTracker
 import com.chat.utils.Utils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -30,55 +28,86 @@ import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
 
 class UserChatVM(
-    context: Application
+    val context: Application
 ): AndroidViewModel(context) {
     lateinit var webSocket: WebSocket
 
     private val _mssgFlow = MutableStateFlow("")
     val mssgFlow: StateFlow<String> = _mssgFlow
 
-    val messages: LiveData<List<ChatMessage>>
-    private val repository: ChatRepository
+    lateinit var messages: LiveData<List<ChatMessage>>
+    val dao = ChatDatabase.getDatabase(context).chatDao()
+    private val repository: ChatRepository = ChatRepository(dao)
 
     private var networkStatusTracker: NetworkStatusTracker = NetworkStatusTracker(context)
     var isConnected: Flow<Boolean> = networkStatusTracker.networkStatus
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), true)
 
-    init {
+    private lateinit var nUsername: String
+
+    private lateinit var listOfUnSyncChat:List<ChatMessage>
+
+    var userActive: Boolean = false
+
+    /*init {
         val dao = ChatDatabase.getDatabase(context).chatDao()
         repository = ChatRepository(dao)
-        messages = repository.allMessages.asLiveData()
+        messages = repository.getAllRecordsByUsername("Support").asLiveData()
+    }*/
+
+    fun getAllRecords(username: String) {
+        nUsername = username
+        userActive = true
+        Log.d("UserChatVM","The GetAllRecords: $username")
+        messages = repository.getAllRecordsByUsername(nUsername).asLiveData()
     }
 
-    fun sendMessage(content: String, username: String = "You") {
-        val msg = ChatMessage(
-            username = username,
-            message = "user: $content",
-            time = System.currentTimeMillis(),
-            isSentByUser = true
-        )
-
+    fun sendMessage(content: String, username: String) {
         viewModelScope.launch {
-            isConnected.collect{
-                if (it){
+            if(Utils.isInternetAvailable(context)){
+
+                    val msg = ChatMessage(
+                        username = username,
+                        message = content,
+                        time = System.currentTimeMillis(),
+                        userFlag = "You",
+                        isSentByUser = true,
+                        isSynced = true,
+                        isRead = userActive
+                    )
                     if (::webSocket.isInitialized) {
-                        webSocket.send("user: $content")
+                        webSocket.send("$username: $content")
                         repository.sendMessage(msg)
                     }
-                } else{
-                    repository.sendMessage(msg)
-                }
+
+            } else{
+                val msg = ChatMessage(
+                    username = username,
+                    message = content,
+                    time = System.currentTimeMillis(),
+                    userFlag = "You",
+                    isSentByUser = true,
+                    isSynced = false,
+                    isRead = userActive
+                )
+                repository.sendMessage(msg)
             }
+            /*isConnected.collect{
+
+            }*/
         }
 
     }
 
-    fun mockReceiveMessage(content: String) {
+    private fun mockReceiveMessage(content: String, username: String) {
         val msg = ChatMessage(
-            username = "Friend",
+            username = username,
             message = content,
             time = System.currentTimeMillis(),
-            isSentByUser = false
+            userFlag = "Friend",
+            isSentByUser = false,
+            isSynced = true,
+            isRead = userActive
         )
         viewModelScope.launch {
             repository.sendMessage(msg)
@@ -104,9 +133,16 @@ class UserChatVM(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 Log.d("PieSocket", "Received: $text")
-                if (text.isNotEmpty() && !text.startsWith("user:")) {
-                    _mssgFlow.value = text.trim()
-                }
+                val parts = text.split(":", limit = 2)
+                val userInfo = parts[0].trim()
+
+                val user = userInfo.split(" ").first()
+
+                if (text.isNotEmpty() && text.startsWith("$user Bot:")) {
+                    storeMessageResponse(text)
+                } /*else {
+                    storeOnlyMessage(text)
+                }*/
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
@@ -121,4 +157,52 @@ class UserChatVM(
         webSocket = client.newWebSocket(request, listener)
     }
 
+    fun storeMessageResponse(text: String) {
+        val parts = text.split(":", limit = 2)
+
+        Log.d("PieSocket", "storeMessageResponse: $text")
+
+        if (parts.size == 2) {
+            val userInfo = parts[0].trim()
+            val message = parts[1].trim()
+            /*_mssgFlow.value = message.trim()*/
+            val user = userInfo.split(" ").first()
+            mockReceiveMessage(message.trim(), user)
+            println("Before Colon: $userInfo")
+            println("After Colon: $message")
+        }
+    }
+
+
+    /*fun storeOnlyMessage(message: String) {
+        if (listOfUnSyncChat.isNotEmpty()) {
+            for (i in listOfUnSyncChat) {
+                if (nMessage == i.message) {
+                    viewModelScope.launch {
+                        repository.updateIsSynced(i.id)
+                    }
+                }
+            }
+        }
+    }*/
+
+    fun getAllUnSyncedChatMessages(username: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            listOfUnSyncChat = repository.getAllUnSyncMessages(username = username)
+            sendUnSyncedMessages()
+        }
+    }
+
+    /*When internet comes then call this method for send message to socket*/
+    private fun sendUnSyncedMessages() {
+        if (listOfUnSyncChat.isNotEmpty()){
+            listOfUnSyncChat.forEach {
+                /*sendMessage(it.message, it.username)*/
+                webSocket.send("${it.username}: ${it.message}")
+                viewModelScope.launch {
+                    repository.updateIsSynced(it.id)
+                }
+            }
+        }
+    }
 }

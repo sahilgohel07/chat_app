@@ -26,13 +26,26 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
         android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/textLatestMessage"
         app:layout_constraintStart_toEndOf="@id/imageViewUser"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- TextView for User Name -->
+    <TextView
+        android:id="@+id/textLatestMessage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:gravity="center_vertical"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:textColor="@color/grey"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/imageViewUser"
+        app:layout_constraintTop_toBottomOf="@id/textViewUserName" />
 
     <View
         android:id="@+id/line1"

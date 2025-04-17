@@ -44,6 +44,9 @@ class UserChatUi : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         viewModel = ViewModelProvider(this)[UserChatVM::class.java]
 
+        viewModel.getAllRecords(username)
+        viewModel.getAllUnSyncedChatMessages(username)
+
         adapter = ChatAdapter()
 
         val recycler = view.findViewById<RecyclerView>(R.id.recyclerChat)
@@ -68,13 +71,13 @@ class UserChatUi : Fragment() {
 
         lifecycleScope.launch {
             viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
+                /*launch {
                     viewModel.mssgFlow.collect{
                         if (!it.isNullOrBlank()) {
                             viewModel.mockReceiveMessage(it)
                         }
                     }
-                }
+                }*/
                 launch {
                     viewModel.isConnected.collect { isConnected ->
                         if (!isConnected) {
@@ -88,7 +91,7 @@ class UserChatUi : Fragment() {
         uiBinding.buttonSend.setOnClickListener {
             val msg = uiBinding.editMessage.text.toString().trim()
             if (msg.isNotEmpty()) {
-                viewModel.sendMessage(msg)
+                viewModel.sendMessage(msg, username)
                 uiBinding.editMessage.setText("")
 
                 // optional mock receiver
@@ -110,6 +113,7 @@ class UserChatUi : Fragment() {
 
     override fun onDestroy() {
         viewModel.webSocket.close(1000,"App closed")
+        viewModel.webSocket.cancel()
         super.onDestroy()
     }
 }

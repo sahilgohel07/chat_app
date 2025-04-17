@@ -2,6 +2,7 @@ package com.chat.ui.home_users
 
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import androidx.recyclerview.widget.RecyclerView
@@ -17,6 +18,10 @@ class UsersListAdapter (
     private lateinit var _binding: UserItemLayoutBinding
 
     private var listener: OnItemClickListener? = null
+
+    private var supportMessage: String = ""
+    private var salesMessage: String = ""
+    private var faqMessage: String = ""
 
     inner class ViewHolder(val binding: UserItemLayoutBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -37,6 +42,30 @@ class UsersListAdapter (
         /*set user name*/
         holder.binding.textViewUserName.text = usersList[position].name
 
+        when (usersList[position].name) {
+            "Support" -> {
+                if (!supportMessage.isNullOrBlank()) {
+                    holder.binding.textLatestMessage.text = supportMessage
+                    holder.binding.textLatestMessage.visibility = View.VISIBLE
+                }
+            }
+            "Sales" -> {
+                if (!supportMessage.isNullOrBlank()) {
+                    holder.binding.textLatestMessage.text = salesMessage
+                    holder.binding.textLatestMessage.visibility = View.VISIBLE
+                }
+            }
+            "FAQ" -> {
+                if (!supportMessage.isNullOrBlank()) {
+                    holder.binding.textLatestMessage.text = faqMessage
+                    holder.binding.textLatestMessage.visibility = View.VISIBLE
+                }
+            }
+            else -> {
+                holder.binding.textLatestMessage.text = ""
+            }
+        }
+
         holder.itemView.setOnClickListener {
             listener?.onItemClick(usersList[position]) // Notify the listener when an item is clicked
         }
@@ -52,6 +81,21 @@ class UsersListAdapter (
 
     fun setOnItemClickListener(listener: OnItemClickListener) {
         this.listener = listener
+    }
+
+    fun provideSupportMessage(latestMessage:String){
+        supportMessage = latestMessage
+        notifyDataSetChanged()
+    }
+
+    fun provideSalesMessage(latestMessage:String){
+        supportMessage = latestMessage
+        notifyDataSetChanged()
+    }
+
+    fun provideFaqMessage(latestMessage:String){
+        supportMessage = latestMessage
+        notifyDataSetChanged()
     }
 
 }
